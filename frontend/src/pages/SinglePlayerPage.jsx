@@ -1,9 +1,9 @@
 import { Chessboard } from 'react-chessboard'
 import Button from '../components/Button'
-import { useLocalChessGame } from '../hooks/useLocalChessGame'
+import { useSinglePlayerGame } from '../hooks/useSinglePlayerGame'
 
 function SinglePlayerPage() {
-  const { status, chessboardOptions, newGame } = useLocalChessGame()
+  const { status, chessboardOptions, newGame } = useSinglePlayerGame()
 
   return (
     <main className="page">

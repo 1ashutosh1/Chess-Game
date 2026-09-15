@@ -1,5 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
+import { chooseComputerMove } from '../engine/computerPlayer'
+
+const HUMAN_COLOR = 'w'
+const COMPUTER_COLOR = 'b'
 
 const SELECTED_SQUARE_STYLE = { backgroundColor: 'rgba(255, 255, 0, 0.4)' }
 const LEGAL_MOVE_DOT_STYLE = {
@@ -9,7 +13,7 @@ const LEGAL_CAPTURE_STYLE = {
   boxShadow: 'inset 0 0 0 4px rgba(0, 0, 0, 0.3)',
 }
 
-function describeStatus(game) {
+function describeStatus(game, isComputerThinking) {
   const sideToMove = game.turn() === 'w' ? 'White' : 'Black'
 
   if (game.isCheckmate()) {
@@ -21,28 +25,61 @@ function describeStatus(game) {
   if (game.isInsufficientMaterial()) return 'Draw — insufficient material'
   if (game.isDrawByFiftyMoves()) return 'Draw — fifty-move rule'
   if (game.isDraw()) return 'Draw'
+  if (isComputerThinking) return 'Computer is thinking…'
   if (game.isCheck()) return `${sideToMove} to move — in check`
   return `${sideToMove} to move`
 }
 
-// Encapsulates a single local (same-device) chess.js game and exposes
-// everything a <Chessboard options={...} /> needs to render and drive it.
-export function useLocalChessGame() {
+// Human plays White, computer plays Black. Every computer reply goes
+// through chooseComputerMove() — swapping that one function for a stronger
+// engine later requires no changes here.
+export function useSinglePlayerGame() {
   const gameRef = useRef(new Chess())
   const [fen, setFen] = useState(gameRef.current.fen())
   const [selectedSquare, setSelectedSquare] = useState(null)
   const [legalMoves, setLegalMoves] = useState([])
+  const [isComputerThinking, setIsComputerThinking] = useState(false)
 
-  const status = useMemo(() => describeStatus(gameRef.current), [fen])
+  const status = useMemo(
+    () => describeStatus(gameRef.current, isComputerThinking),
+    [fen, isComputerThinking],
+  )
   const isGameOver = gameRef.current.isGameOver()
+  const isHumanTurn = gameRef.current.turn() === HUMAN_COLOR && !isComputerThinking && !isGameOver
 
   const clearSelection = useCallback(() => {
     setSelectedSquare(null)
     setLegalMoves([])
   }, [])
 
+  // Let the computer reply whenever it becomes its turn.
+  useEffect(() => {
+    const game = gameRef.current
+    if (game.turn() !== COMPUTER_COLOR || game.isGameOver()) return
+
+    let cancelled = false
+    setIsComputerThinking(true)
+
+    chooseComputerMove(game).then((move) => {
+      if (cancelled) return
+      // Apply the move and clear the "thinking" flag in the same batch —
+      // setting isComputerThinking(false) from a separate .finally() would
+      // race the cleanup this fen update itself triggers.
+      if (move) {
+        game.move(move.san)
+        setFen(game.fen())
+      }
+      setIsComputerThinking(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [fen])
+
   const selectSquare = useCallback(
     (square) => {
+      if (!isHumanTurn) return
       const moves = gameRef.current.moves({ square, verbose: true })
       if (moves.length === 0) {
         clearSelection()
@@ -51,15 +88,16 @@ export function useLocalChessGame() {
       setSelectedSquare(square)
       setLegalMoves(moves)
     },
-    [clearSelection],
+    [clearSelection, isHumanTurn],
   )
 
   const attemptMove = useCallback(
     (from, to) => {
+      if (!isHumanTurn) return false
       const game = gameRef.current
       try {
         // Promotions always default to a queen — pawn-promotion choice is a
-        // later refinement, not needed for the local-play MVP.
+        // later refinement, not needed for the MVP.
         const move = game.move({ from, to, promotion: 'q' })
         if (!move) return false
       } catch {
@@ -69,7 +107,7 @@ export function useLocalChessGame() {
       clearSelection()
       return true
     },
-    [clearSelection],
+    [clearSelection, isHumanTurn],
   )
 
   const onPieceDrop = useCallback(
@@ -92,6 +130,7 @@ export function useLocalChessGame() {
 
   const onSquareClick = useCallback(
     ({ square, piece }) => {
+      if (!isHumanTurn) return
       const game = gameRef.current
 
       if (selectedSquare && legalMoves.some((move) => move.to === square)) {
@@ -110,12 +149,13 @@ export function useLocalChessGame() {
         clearSelection()
       }
     },
-    [selectedSquare, legalMoves, attemptMove, selectSquare, clearSelection],
+    [isHumanTurn, selectedSquare, legalMoves, attemptMove, selectSquare, clearSelection],
   )
 
   const newGame = useCallback(() => {
     gameRef.current.reset()
     setFen(gameRef.current.fen())
+    setIsComputerThinking(false)
     clearSelection()
   }, [clearSelection])
 
@@ -131,13 +171,13 @@ export function useLocalChessGame() {
   }, [selectedSquare, legalMoves])
 
   const chessboardOptions = {
-    id: 'local-game',
+    id: 'single-player-game',
     position: fen,
     onPieceDrop,
     onPieceDrag,
     onSquareClick,
     squareStyles,
-    allowDragging: !isGameOver,
+    allowDragging: isHumanTurn,
   }
 
   return { status, chessboardOptions, newGame }
