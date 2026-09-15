@@ -102,6 +102,9 @@ The backend is authoritative.
 The frontend must NOT be trusted to determine whether a multiplayer move
 is legal.
 
+The backend supports exactly one active two-player game at a time. Supporting
+multiple concurrent games is out of scope for this MVP.
+
 Flow:
 
 Client
@@ -147,6 +150,8 @@ Use:
 ConcurrentHashMap<String, Game>
 
 through InMemoryGameRepository.
+
+For this MVP only one active game exists at a time (one entry in the map).
 
 Games should have an expiration/cleanup mechanism so abandoned games do not
 remain in memory indefinitely.
