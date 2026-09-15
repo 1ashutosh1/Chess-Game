@@ -38,7 +38,7 @@ Do not spend excessive time on visual polish.
 - Spring Web
 - Spring WebSocket
 - A mature Java chess library for server-side move validation
-- ConcurrentHashMap for initial persistence
+- AtomicReference for initial persistence (single active game)
 
 ### Future persistence
 
@@ -137,7 +137,6 @@ A game should contain approximately:
 - current FEN
 - turn
 - status
-- lastActivity
 
 Avoid coupling the Game model directly to database-specific concepts.
 
@@ -147,14 +146,12 @@ Avoid coupling the Game model directly to database-specific concepts.
 
 Use:
 
-ConcurrentHashMap<String, Game>
+AtomicReference<Game>
 
 through InMemoryGameRepository.
 
-For this MVP only one active game exists at a time (one entry in the map).
-
-Games should have an expiration/cleanup mechanism so abandoned games do not
-remain in memory indefinitely.
+Since only one game exists at a time, creating a new game simply replaces the
+current reference — no expiration or cleanup mechanism is needed.
 
 ---
 
