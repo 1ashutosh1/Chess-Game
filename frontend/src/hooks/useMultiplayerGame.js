@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
-import { createGame, joinGame } from '../services/gamesApi'
+import { createGame, getGame, joinGame } from '../services/gamesApi'
 import { connectGameSocket } from '../services/gameSocket'
+import { clearSession, loadSession, saveSession } from '../services/gameStorage'
 
 const COLOR_LABELS = { WHITE: 'White', BLACK: 'Black' }
 const STATUS_LABELS = {
@@ -35,7 +36,48 @@ export function useMultiplayerGame() {
   // which reset it to null in the same event that starts a new game).
   const [connectionStatus, setConnectionStatus] = useState(null)
   const [selectedSquare, setSelectedSquare] = useState(null)
+  // Read once, at mount, and never again — this is what makes the restore
+  // effect below run exactly once regardless of later `game` changes.
+  const [initialSession] = useState(() => loadSession())
+  const [isRestoring, setIsRestoring] = useState(() => Boolean(initialSession))
   const socketRef = useRef(null)
+
+  // On page load, resume whatever game this browser was last playing. Only
+  // gameId/color come from storage — fen/turn/status are always re-fetched
+  // from the backend, never trusted from a stale local copy. Setting `game`
+  // here reuses the exact same WebSocket-connect effect below as create/join
+  // do, so this is also how reconnection happens after a refresh.
+  useEffect(() => {
+    if (!initialSession) return undefined
+
+    let cancelled = false
+    getGame(initialSession.gameId)
+      .then((response) => {
+        if (cancelled) return
+        setGame({
+          gameId: response.gameId,
+          color: initialSession.color,
+          player: initialSession.color === 'WHITE' ? response.whitePlayer : response.blackPlayer,
+          fen: response.fen,
+          turn: response.turn,
+          status: response.status,
+        })
+      })
+      .catch((err) => {
+        if (cancelled) return
+        // Most likely the game is gone (server restarted, or it simply no
+        // longer exists) — drop the stale session so we stop trying.
+        clearSession()
+        setError(err.message)
+      })
+      .finally(() => {
+        if (!cancelled) setIsRestoring(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [initialSession])
 
   // One WebSocket connection per (gameId, player) pair. GAME_STATE updates
   // mutate `game` in place without changing gameId/player, so they don't
@@ -71,6 +113,7 @@ export function useMultiplayerGame() {
     setIsLoading(true)
     try {
       const response = await createGame()
+      saveSession(response.gameId, 'WHITE')
       setConnectionStatus(null)
       setSelectedSquare(null)
       setGame({
@@ -93,6 +136,7 @@ export function useMultiplayerGame() {
     setIsLoading(true)
     try {
       const response = await joinGame(gameId)
+      saveSession(response.gameId, 'BLACK')
       setConnectionStatus(null)
       setSelectedSquare(null)
       setGame({
@@ -212,7 +256,7 @@ export function useMultiplayerGame() {
   return {
     game,
     error,
-    isLoading,
+    isLoading: isLoading || isRestoring,
     connectionStatus,
     connectionLabel:
       !game || connectionStatus === 'OPEN'
