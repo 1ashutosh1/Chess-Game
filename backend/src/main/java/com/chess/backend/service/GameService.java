@@ -4,6 +4,12 @@ import com.chess.backend.model.Game;
 import com.chess.backend.model.GameStatus;
 import com.chess.backend.model.PlayerColor;
 import com.chess.backend.repository.GameRepository;
+import com.github.bhlangonijr.chesslib.Board;
+import com.github.bhlangonijr.chesslib.Piece;
+import com.github.bhlangonijr.chesslib.PieceType;
+import com.github.bhlangonijr.chesslib.Side;
+import com.github.bhlangonijr.chesslib.Square;
+import com.github.bhlangonijr.chesslib.move.Move;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -66,6 +72,92 @@ public class GameService {
         // replaces it, mutating a fetched entity won't persist on its own,
         // so every write path must go through save().
         return gameRepository.save(game);
+    }
+
+    /**
+     * Validates and applies a move using {@code chesslib} as the authoritative
+     * rules engine, then persists the resulting FEN, turn and status. The
+     * frontend only ever sees the outcome of this method — it never decides
+     * legality itself.
+     *
+     * @throws ResponseStatusException 404 if no game exists with that id,
+     *                                  403 if the player is not seated in the game,
+     *                                  409 if the game is not in progress or it is not the player's turn,
+     *                                  400 if the move is not legal in the current position
+     */
+    public Game makeMove(String gameId, String player, String from, String to) {
+        Game game = getGame(gameId);
+        PlayerColor playerColor = colorOf(game, player);
+
+        if (game.getStatus() != GameStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Game " + gameId + " is not in progress");
+        }
+
+        if (playerColor != game.getTurn()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "It is not " + player + "'s turn");
+        }
+
+        Board board = new Board();
+        board.loadFromFen(game.getFen());
+
+        Move move = findLegalMove(board, from, to);
+        if (move == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Illegal move " + from + "-" + to);
+        }
+        board.doMove(move);
+
+        game.setFen(board.getFen());
+        game.setTurn(board.getSideToMove() == Side.WHITE ? PlayerColor.WHITE : PlayerColor.BLACK);
+        game.setStatus(board.isMated() || board.isDraw() ? GameStatus.COMPLETED : GameStatus.IN_PROGRESS);
+
+        return gameRepository.save(game);
+    }
+
+    private static PlayerColor colorOf(Game game, String player) {
+        if (player != null && player.equals(game.getWhitePlayer())) {
+            return PlayerColor.WHITE;
+        }
+        if (player != null && player.equals(game.getBlackPlayer())) {
+            return PlayerColor.BLACK;
+        }
+        throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN, player + " is not a player in game " + game.getGameId());
+    }
+
+    /**
+     * Looks up the matching move among chesslib's own legal moves for the
+     * current position, rather than hand-validating from/to squares —
+     * {@code Board.doMove} only re-checks that a move doesn't leave the king
+     * in check, it does not verify a piece can reach that square at all, so
+     * legality has to come from the generated move list. When the target
+     * square is a promotion, defaults to promoting to a queen since the
+     * frontend does not yet offer underpromotion.
+     */
+    private static Move findLegalMove(Board board, String from, String to) {
+        Square fromSquare = parseSquare(from);
+        Square toSquare = parseSquare(to);
+
+        Move queenPromotion = null;
+        for (Move candidate : board.legalMoves()) {
+            if (candidate.getFrom() != fromSquare || candidate.getTo() != toSquare) {
+                continue;
+            }
+            if (candidate.getPromotion() == Piece.NONE) {
+                return candidate;
+            }
+            if (candidate.getPromotion().getPieceType() == PieceType.QUEEN) {
+                queenPromotion = candidate;
+            }
+        }
+        return queenPromotion;
+    }
+
+    private static Square parseSquare(String square) {
+        try {
+            return Square.valueOf(square.toUpperCase());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid square: " + square);
+        }
     }
 
     public Optional<Game> findGame(String gameId) {

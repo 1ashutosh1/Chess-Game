@@ -96,4 +96,64 @@ class GameServiceTest {
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT);
     }
+
+    @Test
+    void makeMoveAppliesALegalMoveAndFlipsTheTurn() {
+        Game game = gameService.joinGame(gameService.createGame("Alice").getGameId(), "Bob");
+
+        Game moved = gameService.makeMove(game.getGameId(), "Alice", "e2", "e4");
+
+        assertThat(moved.getFen())
+                .isEqualTo("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
+        assertThat(moved.getTurn()).isEqualTo(PlayerColor.BLACK);
+        assertThat(moved.getStatus()).isEqualTo(GameStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void makeMoveThrowsWhenTheMoveIsNotLegal() {
+        Game game = gameService.joinGame(gameService.createGame("Alice").getGameId(), "Bob");
+
+        assertThatThrownBy(() -> gameService.makeMove(game.getGameId(), "Alice", "e2", "e5"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void makeMoveThrowsWhenItIsNotThatPlayersTurn() {
+        Game game = gameService.joinGame(gameService.createGame("Alice").getGameId(), "Bob");
+
+        assertThatThrownBy(() -> gameService.makeMove(game.getGameId(), "Bob", "e7", "e5"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void makeMoveDetectsCheckmateAndCompletesTheGame() {
+        Game game = gameService.joinGame(gameService.createGame("Alice").getGameId(), "Bob");
+
+        // Fool's mate: fastest possible checkmate.
+        gameService.makeMove(game.getGameId(), "Alice", "f2", "f3");
+        gameService.makeMove(game.getGameId(), "Bob", "e7", "e5");
+        gameService.makeMove(game.getGameId(), "Alice", "g2", "g4");
+        Game mated = gameService.makeMove(game.getGameId(), "Bob", "d8", "h4");
+
+        assertThat(mated.getStatus()).isEqualTo(GameStatus.COMPLETED);
+        assertThat(mated.getTurn()).isEqualTo(PlayerColor.WHITE);
+    }
+
+    @Test
+    void makeMoveThrowsWhenTheGameIsAlreadyFinished() {
+        Game game = gameService.joinGame(gameService.createGame("Alice").getGameId(), "Bob");
+        gameService.makeMove(game.getGameId(), "Alice", "f2", "f3");
+        gameService.makeMove(game.getGameId(), "Bob", "e7", "e5");
+        gameService.makeMove(game.getGameId(), "Alice", "g2", "g4");
+        gameService.makeMove(game.getGameId(), "Bob", "d8", "h4");
+
+        assertThatThrownBy(() -> gameService.makeMove(game.getGameId(), "Alice", "a2", "a3"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
 }
