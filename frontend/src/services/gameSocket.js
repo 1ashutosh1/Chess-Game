@@ -9,8 +9,8 @@ const WS_BASE_URL = API_BASE_URL.replace(/^http/, 'ws')
 
 /**
  * Opens one WebSocket connection identifying a single game and player.
- * `handlers` may implement onOpen, onClose, onGameState(state) and
- * onError(message) — all optional.
+ * `handlers` may implement onOpen, onClose, onGameState(state),
+ * onError(message) and onPlayerStatus(status) — all optional.
  *
  * Returns { sendMove(from, to), close() }.
  */
@@ -33,6 +33,8 @@ export function connectGameSocket(gameId, player, handlers = {}) {
       handlers.onGameState?.(data)
     } else if (data.type === 'ERROR') {
       handlers.onError?.(data.message)
+    } else if (data.type === 'PLAYER_STATUS') {
+      handlers.onPlayerStatus?.(data)
     }
   }
 

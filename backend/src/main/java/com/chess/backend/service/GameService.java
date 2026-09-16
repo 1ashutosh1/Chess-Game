@@ -39,8 +39,20 @@ public class GameService {
     /**
      * Creates a new game for the given player, seated as White, on the
      * standard starting position, and persists it via the repository.
+     *
+     * @throws ResponseStatusException 409 if a game is already waiting or in
+     *                                  progress — this MVP has room for only
+     *                                  one active game at a time, so a new
+     *                                  one can't be created until it finishes
      */
     public Game createGame(String whitePlayerName) {
+        gameRepository.findCurrent()
+                .filter(game -> game.getStatus() != GameStatus.COMPLETED)
+                .ifPresent(game -> {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT, "A game is already in progress. Try again once it finishes.");
+                });
+
         Game game = new Game(
                 generateGameId(),
                 nameOrDefault(whitePlayerName, DEFAULT_WHITE_NAME),

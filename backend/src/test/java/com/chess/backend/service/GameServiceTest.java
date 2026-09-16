@@ -37,6 +37,43 @@ class GameServiceTest {
     }
 
     @Test
+    void createGameThrowsWhenAGameIsAlreadyWaitingForAnOpponent() {
+        gameService.createGame("Alice");
+
+        assertThatThrownBy(() -> gameService.createGame("Someone Else"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void createGameThrowsWhenAGameIsAlreadyInProgress() {
+        Game created = gameService.createGame("Alice");
+        gameService.joinGame(created.getGameId(), "Bob");
+
+        assertThatThrownBy(() -> gameService.createGame("Someone Else"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void createGameSucceedsAgainOnceThePreviousGameHasFinished() {
+        Game created = gameService.createGame("Alice");
+        gameService.joinGame(created.getGameId(), "Bob");
+        // Fool's mate: fastest possible checkmate, so the game is COMPLETED.
+        gameService.makeMove(created.getGameId(), "Alice", "f2", "f3");
+        gameService.makeMove(created.getGameId(), "Bob", "e7", "e5");
+        gameService.makeMove(created.getGameId(), "Alice", "g2", "g4");
+        gameService.makeMove(created.getGameId(), "Bob", "d8", "h4");
+
+        Game next = gameService.createGame("Someone Else");
+
+        assertThat(next.getGameId()).isNotEqualTo(created.getGameId());
+        assertThat(next.getStatus()).isEqualTo(GameStatus.WAITING);
+    }
+
+    @Test
     void createdGameCanBeFoundById() {
         Game created = gameService.createGame("Alice");
 
@@ -117,6 +154,18 @@ class GameServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void makeMoveThrowsWhenThePlayerIsNotSeatedInTheGame() {
+        Game game = gameService.joinGame(gameService.createGame("Alice").getGameId(), "Bob");
+
+        // Neither Alice nor Bob — this player has no seat, let alone a color,
+        // in this game.
+        assertThatThrownBy(() -> gameService.makeMove(game.getGameId(), "Mallory", "e2", "e4"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test

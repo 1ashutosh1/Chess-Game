@@ -35,6 +35,10 @@ export function useMultiplayerGame() {
   // synchronously by the effect itself (see handleCreateGame/handleJoinGame,
   // which reset it to null in the same event that starts a new game).
   const [connectionStatus, setConnectionStatus] = useState(null)
+  // Whether the opponent's seat currently has any open WebSocket session,
+  // per the backend's PLAYER_STATUS broadcasts — not this browser's own
+  // connection (see connectionStatus above).
+  const [opponentConnected, setOpponentConnected] = useState(true)
   const [selectedSquare, setSelectedSquare] = useState(null)
   // Read once, at mount, and never again — this is what makes the restore
   // effect below run exactly once regardless of later `game` changes.
@@ -54,6 +58,7 @@ export function useMultiplayerGame() {
     getGame(initialSession.gameId)
       .then((response) => {
         if (cancelled) return
+        setOpponentConnected(true)
         setGame({
           gameId: response.gameId,
           color: initialSession.color,
@@ -99,6 +104,11 @@ export function useMultiplayerGame() {
         setError(message)
         setSelectedSquare(null)
       },
+      onPlayerStatus: (status) => {
+        if (status.player !== game.color) {
+          setOpponentConnected(status.connected)
+        }
+      },
     })
     socketRef.current = socket
 
@@ -115,6 +125,7 @@ export function useMultiplayerGame() {
       const response = await createGame()
       saveSession(response.gameId, 'WHITE')
       setConnectionStatus(null)
+      setOpponentConnected(true)
       setSelectedSquare(null)
       setGame({
         gameId: response.gameId,
@@ -138,6 +149,7 @@ export function useMultiplayerGame() {
       const response = await joinGame(gameId)
       saveSession(response.gameId, 'BLACK')
       setConnectionStatus(null)
+      setOpponentConnected(true)
       setSelectedSquare(null)
       setGame({
         gameId: response.gameId,
@@ -269,5 +281,6 @@ export function useMultiplayerGame() {
     colorLabel: game ? (COLOR_LABELS[game.color] ?? game.color) : null,
     statusLabel: game ? (STATUS_LABELS[game.status] ?? game.status) : null,
     isYourTurn: Boolean(game) && game.status === 'IN_PROGRESS' && game.turn === game.color,
+    opponentStatusLabel: game && !opponentConnected ? 'Opponent disconnected' : null,
   }
 }

@@ -77,13 +77,34 @@ class GameWebSocketHandlerTest {
     @Test
     void disconnectRemovesTheSessionSoLaterBroadcastsSkipIt() throws Exception {
         handler.handleTextMessage(aliceSession, move("e2", "e4")); // now it's Black's turn
+        handler.afterConnectionClosed(aliceSession, CloseStatus.NORMAL);
         clearInvocations(aliceSession, bobSession);
 
-        handler.afterConnectionClosed(aliceSession, CloseStatus.NORMAL);
         handler.handleTextMessage(bobSession, move("e7", "e5"));
 
         verify(bobSession).sendMessage(any(TextMessage.class));
         verify(aliceSession, never()).sendMessage(any(TextMessage.class));
+    }
+
+    @Test
+    void disconnectNotifiesTheRemainingPlayer() throws Exception {
+        handler.afterConnectionClosed(aliceSession, CloseStatus.NORMAL);
+
+        assertThat(lastPayloadSent(bobSession))
+                .contains("\"type\":\"PLAYER_STATUS\"", "\"player\":\"WHITE\"", "\"connected\":false");
+        verify(aliceSession, never()).sendMessage(any(TextMessage.class));
+    }
+
+    @Test
+    void reconnectNotifiesTheOtherPlayer() throws Exception {
+        handler.afterConnectionClosed(aliceSession, CloseStatus.NORMAL);
+        WebSocketSession aliceReconnected = fakeSession(gameId, "Alice");
+        clearInvocations(bobSession);
+
+        handler.afterConnectionEstablished(aliceReconnected);
+
+        assertThat(lastPayloadSent(bobSession))
+                .contains("\"type\":\"PLAYER_STATUS\"", "\"player\":\"WHITE\"", "\"connected\":true");
     }
 
     private TextMessage move(String from, String to) {

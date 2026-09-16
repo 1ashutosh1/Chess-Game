@@ -14,4 +14,10 @@ public interface GameRepository {
     Game save(Game game);
 
     Optional<Game> findById(String gameId);
+
+    /**
+     * The single game this MVP currently has room for, regardless of its id
+     * — used only to check whether a new game can be created yet.
+     */
+    Optional<Game> findCurrent();
 }

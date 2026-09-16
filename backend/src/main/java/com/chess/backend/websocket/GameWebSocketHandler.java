@@ -3,7 +3,10 @@ package com.chess.backend.websocket;
 import com.chess.backend.dto.ErrorMessage;
 import com.chess.backend.dto.GameStateMessage;
 import com.chess.backend.dto.MoveMessage;
+import com.chess.backend.dto.PlayerStatusMessage;
 import com.chess.backend.model.Game;
+import com.chess.backend.model.GameStatus;
+import com.chess.backend.model.PlayerColor;
 import com.chess.backend.service.GameService;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -39,9 +42,19 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         String gameId = gameIdOf(session);
+        String player = playerOf(session);
+        boolean wasAlreadyConnected = hasSessionForPlayer(gameId, player);
         sessionsByGameId.computeIfAbsent(gameId, id -> ConcurrentHashMap.newKeySet()).add(session);
 
-        gameService.findGame(gameId).ifPresent(game -> sendQuietly(session, GameStateMessage.from(game)));
+        gameService.findGame(gameId).ifPresent(game -> {
+            sendQuietly(session, GameStateMessage.from(game));
+            if (!wasAlreadyConnected && game.getStatus() == GameStatus.IN_PROGRESS) {
+                PlayerColor color = colorOf(game, player);
+                if (color != null) {
+                    broadcast(gameId, new PlayerStatusMessage(gameId, color, true));
+                }
+            }
+        });
     }
 
     @Override
@@ -75,9 +88,22 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        Set<WebSocketSession> sessions = sessionsByGameId.get(gameIdOf(session));
+        String gameId = gameIdOf(session);
+        String player = playerOf(session);
+        Set<WebSocketSession> sessions = sessionsByGameId.get(gameId);
         if (sessions != null) {
             sessions.remove(session);
+        }
+
+        if (!hasSessionForPlayer(gameId, player)) {
+            gameService.findGame(gameId).ifPresent(game -> {
+                if (game.getStatus() == GameStatus.IN_PROGRESS) {
+                    PlayerColor color = colorOf(game, player);
+                    if (color != null) {
+                        broadcast(gameId, new PlayerStatusMessage(gameId, color, false));
+                    }
+                }
+            });
         }
     }
 
@@ -93,14 +119,37 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         broadcast(game.getGameId(), GameStateMessage.from(game));
     }
 
-    private void broadcast(String gameId, GameStateMessage state) {
+    private void broadcast(String gameId, Object message) {
         Set<WebSocketSession> sessions = sessionsByGameId.get(gameId);
         if (sessions == null) {
             return;
         }
         for (WebSocketSession session : sessions) {
-            sendQuietly(session, state);
+            sendQuietly(session, message);
         }
+    }
+
+    private boolean hasSessionForPlayer(String gameId, String player) {
+        Set<WebSocketSession> sessions = sessionsByGameId.get(gameId);
+        if (sessions == null) {
+            return false;
+        }
+        for (WebSocketSession session : sessions) {
+            if (player.equals(playerOf(session))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static PlayerColor colorOf(Game game, String player) {
+        if (player.equals(game.getWhitePlayer())) {
+            return PlayerColor.WHITE;
+        }
+        if (player.equals(game.getBlackPlayer())) {
+            return PlayerColor.BLACK;
+        }
+        return null;
     }
 
     private void sendQuietly(WebSocketSession session, Object payload) {

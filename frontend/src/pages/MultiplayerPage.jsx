@@ -18,6 +18,7 @@ function MultiplayerPage() {
     colorLabel,
     statusLabel,
     isYourTurn,
+    opponentStatusLabel,
   } = useMultiplayerGame()
 
   const handleJoinSubmit = (event) => {
@@ -53,6 +54,7 @@ function MultiplayerPage() {
             </div>
           </dl>
           {connectionLabel && <p className="connection-status">{connectionLabel}</p>}
+          {opponentStatusLabel && <p className="opponent-status">{opponentStatusLabel}</p>}
           {error && <p className="error">{error}</p>}
           <div className="board-wrapper">
             <Chessboard options={chessboardOptions} />

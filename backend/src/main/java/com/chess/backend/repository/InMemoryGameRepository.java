@@ -29,4 +29,9 @@ public class InMemoryGameRepository implements GameRepository {
         return Optional.ofNullable(currentGame.get())
                 .filter(game -> game.getGameId().equals(gameId));
     }
+
+    @Override
+    public Optional<Game> findCurrent() {
+        return Optional.ofNullable(currentGame.get());
+    }
 }
