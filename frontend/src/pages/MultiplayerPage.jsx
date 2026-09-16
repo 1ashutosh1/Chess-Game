@@ -1,28 +1,54 @@
 import { useState } from 'react'
 import Button from '../components/Button'
+import { useMultiplayerGame } from '../hooks/useMultiplayerGame'
 
 function MultiplayerPage() {
-  const [gameId, setGameId] = useState('')
+  const [gameIdInput, setGameIdInput] = useState('')
+  const { game, error, isLoading, createGame, joinGame, colorLabel, statusLabel } =
+    useMultiplayerGame()
 
-  // Create/join wiring wait on the backend game endpoints — a later milestone.
-  const handleCreateGame = () => {}
-  const handleJoinGame = () => {}
+  const handleJoinSubmit = (event) => {
+    event.preventDefault()
+    joinGame(gameIdInput.trim().toUpperCase())
+  }
+
+  if (game) {
+    return (
+      <main className="page">
+        <h1>Play With Friend</h1>
+        <p>
+          Game ID: <strong>{game.gameId}</strong>
+        </p>
+        <p>
+          You are: <strong>{colorLabel}</strong>
+        </p>
+        <p className="status">{statusLabel}</p>
+        <Button to="/" variant="secondary">
+          Back
+        </Button>
+      </main>
+    )
+  }
 
   return (
     <main className="page">
       <h1>Play With Friend</h1>
-      <Button onClick={handleCreateGame}>Create Game</Button>
-      <div className="join-row">
+      {error && <p className="error">{error}</p>}
+      <Button onClick={createGame} disabled={isLoading}>
+        Create Game
+      </Button>
+      <form className="join-row" onSubmit={handleJoinSubmit}>
         <input
           type="text"
           placeholder="Enter Game ID"
-          value={gameId}
-          onChange={(event) => setGameId(event.target.value)}
+          value={gameIdInput}
+          onChange={(event) => setGameIdInput(event.target.value)}
+          disabled={isLoading}
         />
-        <Button onClick={handleJoinGame} disabled={!gameId.trim()}>
+        <Button type="submit" disabled={isLoading || !gameIdInput.trim()}>
           Join
         </Button>
-      </div>
+      </form>
       <Button to="/" variant="secondary">
         Back
       </Button>

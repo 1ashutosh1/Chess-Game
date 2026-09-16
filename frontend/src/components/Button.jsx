@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 // Renders a <Link> styled as a button when `to` is given (navigation),
 // otherwise a real <button> (actions like New Game / Create Game / Join).
-function Button({ to, variant = 'primary', className = '', children, ...props }) {
+function Button({ to, variant = 'primary', type = 'button', className = '', children, ...props }) {
   const classes = `btn btn-${variant}${className ? ` ${className}` : ''}`
 
   if (to) {
@@ -14,7 +14,7 @@ function Button({ to, variant = 'primary', className = '', children, ...props })
   }
 
   return (
-    <button type="button" className={classes} {...props}>
+    <button type={type} className={classes} {...props}>
       {children}
     </button>
   )
