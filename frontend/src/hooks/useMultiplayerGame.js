@@ -257,6 +257,7 @@ export function useMultiplayerGame() {
     game,
     error,
     isLoading: isLoading || isRestoring,
+    isRestoring,
     connectionStatus,
     connectionLabel:
       !game || connectionStatus === 'OPEN'
@@ -267,5 +268,6 @@ export function useMultiplayerGame() {
     chessboardOptions,
     colorLabel: game ? (COLOR_LABELS[game.color] ?? game.color) : null,
     statusLabel: game ? (STATUS_LABELS[game.status] ?? game.status) : null,
+    isYourTurn: Boolean(game) && game.status === 'IN_PROGRESS' && game.turn === game.color,
   }
 }

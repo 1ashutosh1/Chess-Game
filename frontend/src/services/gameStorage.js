@@ -31,3 +31,34 @@ export function clearSession() {
     // ignore
   }
 }
+
+// Persists the single-player board position so navigating away (e.g. the
+// Back button) and returning resumes the same game instead of starting
+// over. The FEN is client-authoritative here (there's no backend for single
+// player), so it's safe to trust directly from storage on restore.
+const SINGLE_PLAYER_STORAGE_KEY = 'chess.singleplayer.fen'
+
+export function saveSinglePlayerFen(fen) {
+  try {
+    localStorage.setItem(SINGLE_PLAYER_STORAGE_KEY, fen)
+  } catch {
+    // localStorage can be unavailable (private browsing, quota) — resuming
+    // a game is a convenience, not a requirement, so fail silently.
+  }
+}
+
+export function loadSinglePlayerFen() {
+  try {
+    return localStorage.getItem(SINGLE_PLAYER_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function clearSinglePlayerFen() {
+  try {
+    localStorage.removeItem(SINGLE_PLAYER_STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+}

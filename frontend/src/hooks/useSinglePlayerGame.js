@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
 import { chooseComputerMove } from '../engine/computerPlayer'
+import { clearSinglePlayerFen, loadSinglePlayerFen, saveSinglePlayerFen } from '../services/gameStorage'
 
 const HUMAN_COLOR = 'w'
 const COMPUTER_COLOR = 'b'
@@ -30,11 +31,26 @@ function describeStatus(game, isComputerThinking) {
   return `${sideToMove} to move`
 }
 
+// Resumes whatever position was last saved, if any, so navigating away
+// (e.g. the Back button) and returning doesn't lose the game. Falls back to
+// a fresh board if nothing was saved or the saved FEN is corrupted.
+function createInitialGame() {
+  const savedFen = loadSinglePlayerFen()
+  if (savedFen) {
+    try {
+      return new Chess(savedFen)
+    } catch {
+      clearSinglePlayerFen()
+    }
+  }
+  return new Chess()
+}
+
 // Human plays White, computer plays Black. Every computer reply goes
 // through chooseComputerMove() — swapping that one function for a stronger
 // engine later requires no changes here.
 export function useSinglePlayerGame() {
-  const gameRef = useRef(new Chess())
+  const gameRef = useRef(createInitialGame())
   const [fen, setFen] = useState(gameRef.current.fen())
   const [selectedSquare, setSelectedSquare] = useState(null)
   const [legalMoves, setLegalMoves] = useState([])
@@ -46,6 +62,10 @@ export function useSinglePlayerGame() {
   )
   const isGameOver = gameRef.current.isGameOver()
   const isHumanTurn = gameRef.current.turn() === HUMAN_COLOR && !isComputerThinking && !isGameOver
+
+  useEffect(() => {
+    saveSinglePlayerFen(fen)
+  }, [fen])
 
   const clearSelection = useCallback(() => {
     setSelectedSquare(null)
