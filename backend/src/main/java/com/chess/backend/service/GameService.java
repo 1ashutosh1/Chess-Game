@@ -177,6 +177,23 @@ public class GameService {
     }
 
     /**
+     * Marks a game COMPLETED once nobody is left connected to it — called by
+     * {@code GameWebSocketHandler} when a disconnect leaves a game with zero
+     * open sessions. Without this, an abandoned game stays WAITING or
+     * IN_PROGRESS forever and permanently locks the single game slot that
+     * {@link #createGame} guards, since nothing else ever moves it to
+     * COMPLETED. A no-op if the game is already COMPLETED or doesn't exist.
+     */
+    public void abandonIfUnwatched(String gameId) {
+        findGame(gameId)
+                .filter(game -> game.getStatus() != GameStatus.COMPLETED)
+                .ifPresent(game -> {
+                    game.setStatus(GameStatus.COMPLETED);
+                    gameRepository.save(game);
+                });
+    }
+
+    /**
      * @throws ResponseStatusException 404 if no game exists with that id
      */
     public Game getGame(String gameId) {

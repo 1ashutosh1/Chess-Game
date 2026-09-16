@@ -205,4 +205,43 @@ class GameServiceTest {
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT);
     }
+
+    @Test
+    void abandonIfUnwatchedCompletesAnInProgressGameAndFreesTheSlot() {
+        Game game = gameService.joinGame(gameService.createGame("Alice").getGameId(), "Bob");
+
+        gameService.abandonIfUnwatched(game.getGameId());
+
+        assertThat(gameService.getGame(game.getGameId()).getStatus()).isEqualTo(GameStatus.COMPLETED);
+        // The slot is freed immediately — no CONFLICT this time.
+        Game next = gameService.createGame("Someone Else");
+        assertThat(next.getGameId()).isNotEqualTo(game.getGameId());
+    }
+
+    @Test
+    void abandonIfUnwatchedCompletesAWaitingGame() {
+        Game game = gameService.createGame("Alice");
+
+        gameService.abandonIfUnwatched(game.getGameId());
+
+        assertThat(gameService.getGame(game.getGameId()).getStatus()).isEqualTo(GameStatus.COMPLETED);
+    }
+
+    @Test
+    void abandonIfUnwatchedIsANoopForAGameThatAlreadyFinishedNormally() {
+        Game game = gameService.joinGame(gameService.createGame("Alice").getGameId(), "Bob");
+        gameService.makeMove(game.getGameId(), "Alice", "f2", "f3");
+        gameService.makeMove(game.getGameId(), "Bob", "e7", "e5");
+        gameService.makeMove(game.getGameId(), "Alice", "g2", "g4");
+        gameService.makeMove(game.getGameId(), "Bob", "d8", "h4"); // Fool's mate
+
+        gameService.abandonIfUnwatched(game.getGameId());
+
+        assertThat(gameService.getGame(game.getGameId()).getStatus()).isEqualTo(GameStatus.COMPLETED);
+    }
+
+    @Test
+    void abandonIfUnwatchedIsANoopWhenTheGameDoesNotExist() {
+        gameService.abandonIfUnwatched("NOPE00");
+    }
 }

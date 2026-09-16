@@ -1,6 +1,7 @@
 package com.chess.backend.websocket;
 
 import com.chess.backend.model.Game;
+import com.chess.backend.model.GameStatus;
 import com.chess.backend.repository.InMemoryGameRepository;
 import com.chess.backend.service.GameService;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,6 +106,21 @@ class GameWebSocketHandlerTest {
 
         assertThat(lastPayloadSent(bobSession))
                 .contains("\"type\":\"PLAYER_STATUS\"", "\"player\":\"WHITE\"", "\"connected\":true");
+    }
+
+    @Test
+    void disconnectDoesNotAbandonTheGameWhileTheOtherPlayerIsStillConnected() throws Exception {
+        handler.afterConnectionClosed(aliceSession, CloseStatus.NORMAL);
+
+        assertThat(gameService.findGame(gameId)).get().extracting(Game::getStatus).isEqualTo(GameStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void gameIsAbandonedOnceEverybodyHasDisconnected() throws Exception {
+        handler.afterConnectionClosed(aliceSession, CloseStatus.NORMAL);
+        handler.afterConnectionClosed(bobSession, CloseStatus.NORMAL);
+
+        assertThat(gameService.findGame(gameId)).get().extracting(Game::getStatus).isEqualTo(GameStatus.COMPLETED);
     }
 
     private TextMessage move(String from, String to) {

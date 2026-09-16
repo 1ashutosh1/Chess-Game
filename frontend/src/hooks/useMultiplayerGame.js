@@ -58,6 +58,13 @@ export function useMultiplayerGame() {
     getGame(initialSession.gameId)
       .then((response) => {
         if (cancelled) return
+        if (response.status === 'COMPLETED') {
+          // The game ended (checkmate, draw, or abandonment) while this
+          // browser was away — don't resume into a dead board, land on the
+          // create/join screen instead.
+          clearSession()
+          return
+        }
         setOpponentConnected(true)
         setGame({
           gameId: response.gameId,

@@ -105,6 +105,14 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 }
             });
         }
+
+        // Once literally nobody is left connected, reap the game so it
+        // doesn't permanently occupy the single game slot — see
+        // GameService.abandonIfUnwatched. A player still watching (the
+        // common disconnect case handled above) keeps the game alive.
+        if (sessions == null || sessions.isEmpty()) {
+            gameService.abandonIfUnwatched(gameId);
+        }
     }
 
     /**
