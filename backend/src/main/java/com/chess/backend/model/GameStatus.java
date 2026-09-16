@@ -2,7 +2,7 @@ package com.chess.backend.model;
 
 public enum GameStatus {
     // Created by the first player, waiting for the second to join.
-    WAITING_FOR_OPPONENT,
+    WAITING,
     // Both players present, moves can be made.
     IN_PROGRESS,
     // Checkmate, draw, resignation, or abandonment — the specific reason
