@@ -81,6 +81,18 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    /**
+     * Pushes the current game state to every connected session for that
+     * game. Used by {@code GameController} after a REST call — like a
+     * player joining — changes the game outside of a WebSocket message, so
+     * an already-connected player (e.g. the creator, waiting for an
+     * opponent) isn't left showing a stale snapshot from their initial
+     * connect.
+     */
+    public void broadcastGameState(Game game) {
+        broadcast(game.getGameId(), GameStateMessage.from(game));
+    }
+
     private void broadcast(String gameId, GameStateMessage state) {
         Set<WebSocketSession> sessions = sessionsByGameId.get(gameId);
         if (sessions == null) {

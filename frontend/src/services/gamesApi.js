@@ -1,6 +1,6 @@
 // Every call to the backend's /api/games endpoints goes through this file —
 // components never call fetch() or know the base URL directly.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
 async function request(path, options) {
   let response

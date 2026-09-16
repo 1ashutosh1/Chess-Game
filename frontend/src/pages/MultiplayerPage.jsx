@@ -1,11 +1,21 @@
 import { useState } from 'react'
+import { Chessboard } from 'react-chessboard'
 import Button from '../components/Button'
 import { useMultiplayerGame } from '../hooks/useMultiplayerGame'
 
 function MultiplayerPage() {
   const [gameIdInput, setGameIdInput] = useState('')
-  const { game, error, isLoading, createGame, joinGame, colorLabel, statusLabel } =
-    useMultiplayerGame()
+  const {
+    game,
+    error,
+    isLoading,
+    connectionLabel,
+    createGame,
+    joinGame,
+    chessboardOptions,
+    colorLabel,
+    statusLabel,
+  } = useMultiplayerGame()
 
   const handleJoinSubmit = (event) => {
     event.preventDefault()
@@ -15,14 +25,15 @@ function MultiplayerPage() {
   if (game) {
     return (
       <main className="page">
-        <h1>Play With Friend</h1>
+        <h1 className="status">{statusLabel}</h1>
         <p>
-          Game ID: <strong>{game.gameId}</strong>
+          Game ID: <strong>{game.gameId}</strong> — You are: <strong>{colorLabel}</strong>
         </p>
-        <p>
-          You are: <strong>{colorLabel}</strong>
-        </p>
-        <p className="status">{statusLabel}</p>
+        {connectionLabel && <p className="connection-status">{connectionLabel}</p>}
+        {error && <p className="error">{error}</p>}
+        <div className="board-wrapper">
+          <Chessboard options={chessboardOptions} />
+        </div>
         <Button to="/" variant="secondary">
           Back
         </Button>
