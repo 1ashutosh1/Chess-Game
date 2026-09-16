@@ -5,10 +5,11 @@ import { connectGameSocket } from '../services/gameSocket'
 import { clearSession, loadSession, saveSession } from '../services/gameStorage'
 
 const COLOR_LABELS = { WHITE: 'White', BLACK: 'Black' }
+// COMPLETED isn't here — its label always comes from describeGameEnd below,
+// which knows the actual reason the game ended.
 const STATUS_LABELS = {
   WAITING: 'Waiting for opponent',
   IN_PROGRESS: 'In progress',
-  COMPLETED: 'Completed',
 }
 const CONNECTION_LABELS = {
   CLOSED: 'Disconnected from game server',
@@ -20,6 +21,27 @@ const LEGAL_MOVE_DOT_STYLE = {
 }
 const LEGAL_CAPTURE_STYLE = {
   boxShadow: 'inset 0 0 0 4px rgba(0, 0, 0, 0.3)',
+}
+
+// The backend's COMPLETED status doesn't say why the game ended — it covers
+// checkmate, every draw type, and a player disconnecting before any of those
+// happened. Derive the actual reason client-side from the final position,
+// the same way useSinglePlayerGame derives its status text.
+function describeGameEnd(position) {
+  if (position.isCheckmate()) {
+    const winner = position.turn() === 'w' ? 'Black' : 'White'
+    return `Checkmate — ${winner} wins`
+  }
+  if (position.isStalemate()) return 'Draw — stalemate'
+  if (position.isThreefoldRepetition()) return 'Draw — threefold repetition'
+  if (position.isInsufficientMaterial()) return 'Draw — insufficient material'
+  if (position.isDrawByFiftyMoves()) return 'Draw — fifty-move rule'
+  if (position.isDraw()) return 'Draw'
+  // None of the above — the position is still playable, so COMPLETED here
+  // can only mean a player disconnected before the game actually ended.
+  // Worded differently from opponentStatusLabel's live "Opponent
+  // disconnected" banner, since this one is the permanent final status.
+  return 'Ended — opponent disconnected'
 }
 
 // Drives the "Play With Friend" flow: create or join a game over REST, then
@@ -286,7 +308,11 @@ export function useMultiplayerGame() {
     joinGame: handleJoinGame,
     chessboardOptions,
     colorLabel: game ? (COLOR_LABELS[game.color] ?? game.color) : null,
-    statusLabel: game ? (STATUS_LABELS[game.status] ?? game.status) : null,
+    statusLabel: game
+      ? game.status === 'COMPLETED'
+        ? describeGameEnd(localPosition)
+        : (STATUS_LABELS[game.status] ?? game.status)
+      : null,
     isYourTurn: Boolean(game) && game.status === 'IN_PROGRESS' && game.turn === game.color,
     opponentStatusLabel: game && !opponentConnected ? 'Opponent disconnected' : null,
   }
