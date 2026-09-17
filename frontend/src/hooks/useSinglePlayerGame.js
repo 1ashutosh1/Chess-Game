@@ -72,7 +72,6 @@ export function useSinglePlayerGame() {
     setLegalMoves([])
   }, [])
 
-  // Let the computer reply whenever it becomes its turn.
   useEffect(() => {
     const game = gameRef.current
     if (game.turn() !== COMPUTER_COLOR || game.isGameOver()) return

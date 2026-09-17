@@ -27,9 +27,7 @@ export function loadSession() {
 export function clearSession() {
   try {
     localStorage.removeItem(STORAGE_KEY)
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 // Persists the single-player board position so navigating away (e.g. the
@@ -58,7 +56,5 @@ export function loadSinglePlayerFen() {
 export function clearSinglePlayerFen() {
   try {
     localStorage.removeItem(SINGLE_PLAYER_STORAGE_KEY)
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
