@@ -10,6 +10,7 @@ function MultiplayerPage() {
     game,
     error,
     isLoading,
+    pendingAction,
     isRestoring,
     connectionLabel,
     createGame,
@@ -70,7 +71,7 @@ function MultiplayerPage() {
           <h1>Play With Friend</h1>
           {error && <p className="error">{error}</p>}
           <Button onClick={createGame} disabled={isLoading}>
-            Create Game
+            {pendingAction === 'create' ? 'Creating Game…' : 'Create Game'}
           </Button>
           <form className="join-row" onSubmit={handleJoinSubmit}>
             <input
@@ -81,7 +82,7 @@ function MultiplayerPage() {
               disabled={isLoading}
             />
             <Button type="submit" disabled={isLoading || !gameIdInput.trim()}>
-              Join
+              {pendingAction === 'join' ? 'Joining…' : 'Join'}
             </Button>
           </form>
           <div className="back-row">

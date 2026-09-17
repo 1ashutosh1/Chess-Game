@@ -51,7 +51,10 @@ function describeGameEnd(position) {
 export function useMultiplayerGame() {
   const [game, setGame] = useState(null) // { gameId, color, player, fen, turn, status }
   const [error, setError] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
+  // Which REST action is currently in flight ('create' | 'join' | null), so
+  // the page can show feedback (e.g. "Creating…") on the button the player
+  // actually clicked, not just disable everything.
+  const [pendingAction, setPendingAction] = useState(null)
   // null while a connection attempt is in flight, then 'OPEN' or 'CLOSED' —
   // driven entirely by the socket's own onOpen/onClose events, never set
   // synchronously by the effect itself (see handleCreateGame/handleJoinGame,
@@ -149,7 +152,7 @@ export function useMultiplayerGame() {
 
   const handleCreateGame = useCallback(async () => {
     setError(null)
-    setIsLoading(true)
+    setPendingAction('create')
     try {
       const response = await createGame()
       saveSession(response.gameId, 'WHITE')
@@ -167,13 +170,13 @@ export function useMultiplayerGame() {
     } catch (err) {
       setError(err.message)
     } finally {
-      setIsLoading(false)
+      setPendingAction(null)
     }
   }, [])
 
   const handleJoinGame = useCallback(async (gameId) => {
     setError(null)
-    setIsLoading(true)
+    setPendingAction('join')
     try {
       const response = await joinGame(gameId)
       saveSession(response.gameId, 'BLACK')
@@ -191,7 +194,7 @@ export function useMultiplayerGame() {
     } catch (err) {
       setError(err.message)
     } finally {
-      setIsLoading(false)
+      setPendingAction(null)
     }
   }, [])
 
@@ -297,7 +300,8 @@ export function useMultiplayerGame() {
   return {
     game,
     error,
-    isLoading: isLoading || isRestoring,
+    isLoading: Boolean(pendingAction) || isRestoring,
+    pendingAction,
     isRestoring,
     connectionStatus,
     connectionLabel:
